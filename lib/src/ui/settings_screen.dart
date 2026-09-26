@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'layout.dart';
 import 'screen_header.dart';
 
 /// Settings tab. Rows are inert for now; each one becomes real as the
@@ -11,7 +12,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.only(bottom: kBottomOverlayInset),
         children: [
           const ScreenHeader(title: 'Settings'),
           _Section(

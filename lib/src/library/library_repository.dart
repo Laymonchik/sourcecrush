@@ -82,6 +82,9 @@ class LibraryRepository {
       'assets/demo/Test Artist - First Track.mp3',
       'assets/demo/Test Artist - Second Track.mp3',
       'assets/demo/Another One - Third Track.flac',
+      // Deliberately long, to exercise the marquee in the player pill.
+      'assets/demo/Aurora Borealis feat. The Midnight Sons - '
+          'An Extraordinarily Long Song Title That Will Not Fit.mp3',
     ];
 
     final dir = await musicDirectory();

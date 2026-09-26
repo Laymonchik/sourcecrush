@@ -45,19 +45,31 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: IndexedStack(
-        index: _index,
+      // The player and navigation float on top of the page, so the content
+      // behind them keeps scrolling instead of being pushed up by a reserved
+      // bottom bar.
+      body: Stack(
         children: [
-          HomeScreen(controller: widget.controller),
-          const SearchScreen(),
-          const LikedScreen(),
-          const SettingsScreen(),
+          IndexedStack(
+            index: _index,
+            children: [
+              HomeScreen(controller: widget.controller),
+              const SearchScreen(),
+              const LikedScreen(),
+              const SettingsScreen(),
+            ],
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _BottomArea(
+              controller: widget.controller,
+              index: _index,
+              onChanged: (value) => setState(() => _index = value),
+            ),
+          ),
         ],
-      ),
-      bottomNavigationBar: _BottomArea(
-        controller: widget.controller,
-        index: _index,
-        onChanged: (value) => setState(() => _index = value),
       ),
     );
   }

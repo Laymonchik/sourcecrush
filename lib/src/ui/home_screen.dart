@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../player_controller.dart';
 import 'empty_state.dart';
+import 'layout.dart';
 import 'screen_header.dart';
 
 /// Library tab: everything currently in the app's music directory.
@@ -45,7 +46,7 @@ class _TrackList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      padding: const EdgeInsets.only(top: 8, bottom: kBottomOverlayInset),
       itemCount: controller.tracks.length,
       separatorBuilder: (_, _) => const Divider(
         height: 1,
