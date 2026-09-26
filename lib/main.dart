@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'src/audio/sourcecrush_audio_handler.dart';
+import 'src/library/likes_controller.dart';
 import 'src/library/library_repository.dart';
 import 'src/player_controller.dart';
 import 'src/ui/app_shell.dart';
+import 'src/ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,37 +35,39 @@ Future<void> main() async {
   );
 
   final controller = PlayerController(handler)..attach();
+  final likes = LikesController();
 
   // Debug builds ship with a few bundled clips so the player can be exercised
   // before the yt-dlp download pipeline is wired up.
   if (kDebugMode) {
     await const LibraryRepository().seedDemoTracks();
   }
-  await controller.refreshLibrary();
 
-  runApp(SourcecrushApp(controller: controller));
+  // Likes load on their own: the library scan is asynchronous and can take a
+  // while on a large folder, and pruning against a half-built library would
+  // delete perfectly good likes.
+  await Future.wait([controller.refreshLibrary(), likes.load()]);
+
+  runApp(SourcecrushApp(controller: controller, likes: likes));
 }
 
 class SourcecrushApp extends StatelessWidget {
-  const SourcecrushApp({super.key, required this.controller});
+  const SourcecrushApp({
+    super.key,
+    required this.controller,
+    required this.likes,
+  });
 
   final PlayerController controller;
+  final LikesController likes;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'sourcecrush',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3DDC84),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      home: AppShell(controller: controller),
+      theme: buildSourcecrushTheme(),
+      home: AppShell(controller: controller, likes: likes),
     );
   }
 }

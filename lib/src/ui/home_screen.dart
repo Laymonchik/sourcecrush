@@ -1,34 +1,55 @@
 import 'package:flutter/material.dart';
 
+import '../library/likes_controller.dart';
+import '../models/track.dart';
 import '../player_controller.dart';
 import 'empty_state.dart';
 import 'layout.dart';
 import 'screen_header.dart';
+import 'theme.dart';
 
-/// Library tab: everything currently in the app's music directory.
+/// Library tab: everything the app manages, plus whatever the user has chosen
+/// to expose from their own folders.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.controller});
+  const HomeScreen({
+    super.key,
+    required this.controller,
+    required this.likes,
+  });
 
   final PlayerController controller;
+  final LikesController likes;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: AnimatedBuilder(
-        animation: controller,
+        animation: Listenable.merge([controller, likes]),
         builder: (context, _) {
           final tracks = controller.tracks;
+          final folderCount = controller.folders.length;
+
           return Column(
             children: [
-              const ScreenHeader(title: 'Library'),
+              ScreenHeader(
+                title: 'Library',
+                trailing: _LibraryActions(
+                  folderCount: folderCount,
+                  isScanning: controller.isScanning,
+                  onAddFolder: () => controller.addMusicFolder(),
+                ),
+              ),
               Expanded(
                 child: tracks.isEmpty
-                    ? const EmptyState(
+                    ? EmptyState(
                         icon: Icons.library_music_outlined,
                         title: 'Nothing here yet',
-                        message: 'Tracks you download will show up here.',
+                        message: folderCount == 0
+                            ? 'Add a folder to scan, or search for something '
+                                'to download.'
+                            : 'No audio found in your folders yet.',
                       )
-                    : _TrackList(controller: controller),
+                    : _TrackList(controller: controller, likes: likes),
               ),
             ],
           );
@@ -38,10 +59,58 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+class _LibraryActions extends StatelessWidget {
+  const _LibraryActions({
+    required this.folderCount,
+    required this.isScanning,
+    required this.onAddFolder,
+  });
+
+  final int folderCount;
+  final bool isScanning;
+  final Future<void> Function() onAddFolder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isScanning)
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: SC.textFaint,
+              ),
+            ),
+          ),
+        TextButton.icon(
+          onPressed: isScanning ? null : onAddFolder,
+          icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+          label: Text(folderCount == 0 ? 'Add folder' : 'Folders ($folderCount)'),
+          style: TextButton.styleFrom(
+            foregroundColor: SC.text,
+            textStyle: const TextStyle(fontSize: 13),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+              side: const BorderSide(color: SC.outline),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _TrackList extends StatelessWidget {
-  const _TrackList({required this.controller});
+  const _TrackList({required this.controller, required this.likes});
 
   final PlayerController controller;
+  final LikesController likes;
 
   @override
   Widget build(BuildContext context) {
@@ -51,18 +120,19 @@ class _TrackList extends StatelessWidget {
       separatorBuilder: (_, _) => const Divider(
         height: 1,
         thickness: 1,
-        color: Color(0x14FFFFFF),
+        color: SC.outline,
         indent: 76,
       ),
       itemBuilder: (context, index) {
         final track = controller.tracks[index];
         final isCurrent = controller.currentIndex == index;
         return _TrackTile(
-          title: track.title,
-          artist: track.artist,
+          track: track,
           isCurrent: isCurrent,
           isPlaying: isCurrent && controller.playing,
+          isLiked: likes.isLiked(track.id),
           onTap: () => controller.playTrackAt(index),
+          onToggleLike: () => likes.toggle(track),
         );
       },
     );
@@ -71,23 +141,23 @@ class _TrackList extends StatelessWidget {
 
 class _TrackTile extends StatelessWidget {
   const _TrackTile({
-    required this.title,
-    required this.artist,
+    required this.track,
     required this.isCurrent,
     required this.isPlaying,
+    required this.isLiked,
     required this.onTap,
+    required this.onToggleLike,
   });
 
-  final String title;
-  final String artist;
+  final Track track;
   final bool isCurrent;
   final bool isPlaying;
+  final bool isLiked;
   final VoidCallback onTap;
+  final VoidCallback onToggleLike;
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -98,16 +168,16 @@ class _TrackTile extends StatelessWidget {
               width: 36,
               height: 36,
               child: isPlaying
-                  ? _PlayingBars(color: accent)
+                  ? _PlayingBars()
                   : DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
+                        color: SC.surface,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
                         Icons.music_note,
                         size: 18,
-                        color: Colors.white38,
+                        color: SC.textFaint,
                       ),
                     ),
             ),
@@ -117,22 +187,22 @@ class _TrackTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    track.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isCurrent ? accent : Colors.white,
+                    style: const TextStyle(
+                      color: SC.text,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    artist,
+                    track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.45),
+                    style: const TextStyle(
+                      color: SC.textMuted,
                       fontSize: 13,
                     ),
                   ),
@@ -140,10 +210,11 @@ class _TrackTile extends StatelessWidget {
               ),
             ),
             IconButton(
-              onPressed: onTap,
+              onPressed: onToggleLike,
               iconSize: 20,
-              color: Colors.white.withValues(alpha: 0.3),
-              icon: const Icon(Icons.favorite_border),
+              color: isLiked ? SC.text : SC.textGhost,
+              icon: Icon(isLiked ? Icons.favorite : Icons.favorite_border),
+              tooltip: isLiked ? 'Remove from Liked' : 'Add to Liked',
             ),
           ],
         ),
@@ -154,9 +225,7 @@ class _TrackTile extends StatelessWidget {
 
 /// Tiny animated bars shown on the row that is currently playing.
 class _PlayingBars extends StatefulWidget {
-  const _PlayingBars({required this.color});
-
-  final Color color;
+  const _PlayingBars();
 
   @override
   State<_PlayingBars> createState() => _PlayingBarsState();
@@ -191,7 +260,7 @@ class _PlayingBarsState extends State<_PlayingBars>
               height: height,
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               decoration: BoxDecoration(
-                color: widget.color,
+                color: SC.text,
                 borderRadius: BorderRadius.circular(2),
               ),
             );

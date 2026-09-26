@@ -1,29 +1,57 @@
 package com.mako.sourcecrush
 
+import android.content.Intent
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Small bridge for the handful of platform facts Dart cannot discover itself.
+ * Host activity for the Flutter app.
  *
- * Right now that is just [applicationInfo.nativeLibraryDir]: Android does not
- * allow executing files from the app's data directory (W^X), so helper binaries
- * such as ffmpeg have to be shipped inside the APK and run from the native
- * library directory instead.
+ * Extends [AudioServiceActivity] because audio_service requires it: a plain
+ * FlutterActivity makes the plugin fail to attach to the engine.
  */
 class MainActivity : AudioServiceActivity() {
+
+    private var channel: MethodChannel? = null
+    private var folders: MusicFolders? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-            .setMethodCallHandler { call, result ->
+        val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        val folderHandler = MusicFolders(this, ch)
+
+        ch.setMethodCallHandler(object : MethodChannel.MethodCallHandler {
+            override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
                 when (call.method) {
-                    "nativeLibraryDir" -> result.success(applicationInfo.nativeLibraryDir)
-                    else -> result.notImplemented()
+                    // Handled here rather than in MusicFolders because it needs
+                    // no I/O and reads straight off the ApplicationInfo.
+                    "nativeLibraryDir" ->
+                        result.success(applicationInfo.nativeLibraryDir)
+                    else -> folderHandler.onMethodCall(call, result)
                 }
             }
+        })
+
+        channel = ch
+        folders = folderHandler
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // Give the folder picker first refusal; anything else falls through to
+        // the default handling.
+        if (folders?.onActivityResult(requestCode, resultCode, data) == true) return
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun onDestroy() {
+        folders?.dispose()
+        folders = null
+        channel?.setMethodCallHandler(null)
+        channel = null
+        super.onDestroy()
     }
 
     private companion object {

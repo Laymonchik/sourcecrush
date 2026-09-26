@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// Shared "nothing here yet" placeholder so every tab looks intentional even
 /// before the corresponding feature exists.
 class EmptyState extends StatelessWidget {
@@ -22,13 +24,13 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 52, color: Colors.white.withValues(alpha: 0.16)),
+            Icon(icon, size: 52, color: SC.textGhost),
             const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white70,
+                color: SC.textMuted,
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
@@ -38,7 +40,7 @@ class EmptyState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.38),
+                color: SC.textFaint,
                 fontSize: 14,
                 height: 1.4,
               ),

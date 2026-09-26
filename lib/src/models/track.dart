@@ -2,12 +2,17 @@ import 'package:audio_service/audio_service.dart';
 
 /// A single playable item in the library.
 ///
-/// Right now tracks come from files in the app's own music directory, which is
-/// also where the yt-dlp/ffmpeg pipeline will write to later on.
+/// Tracks come from three places, all of which resolve to a URI rather than a
+/// filesystem path:
+///
+///  * the app's own `music` directory, where the yt-dlp/ffmpeg pipeline writes
+///    (`file://` URIs),
+///  * folders the user granted through the system picker (`content://` URIs),
+///  * and later, streamed sources.
 class Track {
   const Track({
     required this.id,
-    required this.path,
+    required this.uri,
     required this.title,
     this.artist = 'Unknown artist',
     this.album,
@@ -16,16 +21,23 @@ class Track {
   });
 
   final String id;
-  final String path;
+
+  /// `file://` or `content://` URI. just_audio plays both through ExoPlayer.
+  final String uri;
+
   final String title;
   final String artist;
   final String? album;
   final Duration? duration;
   final Uri? artUri;
 
-  /// Audio formats ExoPlayer/just_audio can decode without ffmpeg help.
+  /// Convenience for callers that want the parsed URI.
+  Uri get parsedUri => Uri.parse(uri);
+
+  /// Audio formats ExoPlayer can decode without help from ffmpeg.
   static const supportedExtensions = <String>{
-    'mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'oga', 'webm', 'mp4', 'mka',
+    'mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'oga',
+    'webm', 'mp4', 'mka', 'wma', 'aiff', 'aif', 'ape', 'wv', 'tta',
   };
 
   MediaItem toMediaItem() => MediaItem(
@@ -35,7 +47,7 @@ class Track {
         album: album,
         duration: duration,
         artUri: artUri,
-        extras: {'path': path},
+        extras: {'uri': uri},
       );
 
   @override

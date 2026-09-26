@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// Big screen title used at the top of each tab.
 class ScreenHeader extends StatelessWidget {
   const ScreenHeader({super.key, required this.title, this.trailing});
@@ -17,7 +19,7 @@ class ScreenHeader extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
+              color: SC.text,
               fontSize: 28,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.5,

@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../library/likes_controller.dart';
 import '../player_controller.dart';
 import 'home_screen.dart';
 import 'liked_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'mini_player.dart';
+import 'theme.dart';
 
 /// Top level navigation: the four main destinations plus the persistent
 /// mini player, which floats above the navigation pill.
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.controller});
+  const AppShell({
+    super.key,
+    required this.controller,
+    required this.likes,
+  });
 
   final PlayerController controller;
+  final LikesController likes;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -53,10 +60,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           IndexedStack(
             index: _index,
             children: [
-              HomeScreen(controller: widget.controller),
+              HomeScreen(
+                controller: widget.controller,
+                likes: widget.likes,
+              ),
               const SearchScreen(),
-              const LikedScreen(),
-              const SettingsScreen(),
+              LikedScreen(
+                likes: widget.likes,
+                player: widget.controller,
+              ),
+              SettingsScreen(controller: widget.controller),
             ],
           ),
           Positioned(
@@ -150,8 +163,6 @@ class _NavPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
       child: Center(
@@ -162,9 +173,9 @@ class _NavPill extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xFF16161A),
+              color: SC.surfaceHigh,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(color: SC.outline),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.5),
@@ -180,7 +191,7 @@ class _NavPill extends StatelessWidget {
                   _NavItem(
                     destination: _destinations[i],
                     active: i == index,
-                    accent: accent,
+                    accent: SC.text,
                     onTap: () => onChanged(i),
                   ),
               ],
@@ -211,7 +222,7 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon = Icon(
       active ? destination.activeIcon : destination.icon,
-      color: active ? accent : Colors.white.withValues(alpha: 0.45),
+      color: active ? accent : SC.textMuted,
       size: 22,
     );
 
@@ -244,7 +255,7 @@ class _NavItem extends StatelessWidget {
       selected: active,
       label: destination.label,
       child: Material(
-        color: active ? Colors.white.withValues(alpha: 0.07) : Colors.transparent,
+        color: active ? SC.surfaceHigh : Colors.transparent,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           onTap: onTap,

@@ -7,6 +7,7 @@ import '../models/track.dart';
 import '../player_controller.dart';
 import 'marquee_text.dart';
 import 'now_playing_screen.dart';
+import 'theme.dart';
 
 /// Floating "now playing" pill.
 ///
@@ -47,7 +48,6 @@ class MiniPlayer extends StatelessWidget {
         final track = controller.currentTrack;
         if (track == null) return const SizedBox.shrink();
 
-        final accent = Theme.of(context).colorScheme.primary;
         final durationMs = controller.duration.inMilliseconds;
         final progress = durationMs == 0
             ? 0.0
@@ -63,9 +63,9 @@ class MiniPlayer extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   // Translucent so whatever is underneath stays visible.
-                  color: const Color(0xFF16161A).withValues(alpha: 0.72),
+                  color: SC.surfaceHigh.withValues(alpha: 0.72),
                   borderRadius: _radius,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                  border: Border.all(color: SC.outline),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -76,7 +76,7 @@ class MiniPlayer extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: progress,
                         backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation(accent),
+                        valueColor: const AlwaysStoppedAnimation(SC.text),
                       ),
                     ),
                     Padding(
@@ -90,7 +90,7 @@ class MiniPlayer extends StatelessWidget {
                           GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () => _openNowPlaying(context),
-                            child: _Artwork(track: track, accent: accent),
+                            child: _Artwork(track: track),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -104,7 +104,7 @@ class MiniPlayer extends StatelessWidget {
                                   MarqueeText(
                                     text: track.title,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: SC.text,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                       height: 1.2,
@@ -117,8 +117,8 @@ class MiniPlayer extends StatelessWidget {
                                     track.artist,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5),
+                                    style: const TextStyle(
+                                      color: SC.textMuted,
                                       fontSize: 12,
                                       height: 1.2,
                                     ),
@@ -133,7 +133,7 @@ class MiniPlayer extends StatelessWidget {
                             onPressed: controller.previous,
                             child: const Icon(
                               Icons.skip_previous,
-                              color: Colors.white,
+                              color: SC.text,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -151,10 +151,7 @@ class MiniPlayer extends StatelessWidget {
                           _RoundButton(
                             iconSize: 20,
                             onPressed: controller.next,
-                            child: const Icon(
-                              Icons.skip_next,
-                              color: Colors.white,
-                            ),
+                            child: const Icon(Icons.skip_next, color: SC.text),
                           ),
                         ],
                       ),
@@ -170,13 +167,12 @@ class MiniPlayer extends StatelessWidget {
   }
 }
 
-/// Circular album art. Falls back to a gradient placeholder until real cover
-/// art is available from the download pipeline.
+/// Circular album art. Falls back to a grey placeholder until real cover art is
+/// available from the download pipeline.
 class _Artwork extends StatelessWidget {
-  const _Artwork({required this.track, required this.accent});
+  const _Artwork({required this.track});
 
   final Track track;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -184,9 +180,9 @@ class _Artwork extends StatelessWidget {
     final isLocalFile = artUri != null && artUri.scheme == 'file';
     final hasNetworkArt = artUri != null && artUri.scheme == 'http';
 
-    Widget child = Icon(
+    Widget child = const Icon(
       Icons.music_note,
-      color: accent,
+      color: Color(0xB3FFFFFF),
       size: 20,
     );
 
@@ -209,12 +205,8 @@ class _Artwork extends StatelessWidget {
       height: 46,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accent, accent.withValues(alpha: 0.30)],
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        gradient: SC.artworkGradient,
+        border: Border.all(color: SC.outline),
       ),
       child: ClipOval(child: child),
     );
@@ -238,24 +230,17 @@ class _RoundButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-
     return SizedBox(
       width: size,
       height: size,
       child: Material(
-        color: emphasised
-            ? accent
-            : Colors.white.withValues(alpha: 0.08),
+        color: emphasised ? SC.text : SC.surfaceHigh,
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onPressed,
           child: Center(
-            child: IconTheme(
-              data: IconThemeData(size: iconSize),
-              child: child,
-            ),
+            child: IconTheme(data: IconThemeData(size: iconSize), child: child),
           ),
         ),
       ),

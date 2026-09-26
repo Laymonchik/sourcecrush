@@ -5,12 +5,12 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/track.dart';
 
-/// Discovers playable files on disk.
+/// Owns the app's own music directory: everything the download pipeline
+/// (yt-dlp + ffmpeg) writes, plus the debug demo clips.
 ///
-/// Everything the app downloads (via yt-dlp + ffmpeg) and everything the user
-/// imports ends up under `<app documents>/music`, so that is the single source
-/// of truth for now. Reading the system MediaStore library can be layered on
-/// later without changing the player.
+/// Folders the user picks from the system are handled separately by
+/// `MusicFolderRepository`, because those live behind `content://` URIs rather
+/// than on the app's filesystem.
 class LibraryRepository {
   const LibraryRepository();
 
@@ -27,8 +27,8 @@ class LibraryRepository {
   /// Scans [musicDirectory] for supported audio files.
   ///
   /// Filenames are parsed for a `Artist - Title` shape, which is the naming
-  /// convention the download pipeline will use. Once real tags are available
-  /// (via ffprobe) this gets replaced by tag data.
+  /// convention the download pipeline uses. Once real tags are available (via
+  /// ffprobe) this gets replaced by tag data.
   Future<List<Track>> scan() async {
     final dir = await musicDirectory();
 
@@ -45,8 +45,8 @@ class LibraryRepository {
     return [
       for (final file in files)
         Track(
-          id: file.path,
-          path: file.path,
+          id: file.uri.toString(),
+          uri: file.uri.toString(),
           title: titleFromFileName(file.uri.pathSegments.last),
           artist: artistFromFileName(file.uri.pathSegments.last),
         ),

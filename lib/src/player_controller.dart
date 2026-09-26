@@ -1,29 +1,35 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart' show LoopMode;
 
-import 'audio/sourcecrush_audio_handler.dart';import 'library/library_repository.dart';
+import 'audio/sourcecrush_audio_handler.dart';
+import 'library/library_repository.dart';
+import 'library/music_folder_repository.dart';
+import 'library/native_bridge.dart';
 import 'models/track.dart';
 
-/// UI-facing facade over [SourcecrushAudioHandler] and the library on disk.
+/// UI-facing facade over [SourcecrushAudioHandler] and the library sources.
 ///
 /// Everything the widgets need to render lives here as a [ChangeNotifier] so
 /// the UI can stay dumb: it reads fields and calls intent methods.
 class PlayerController extends ChangeNotifier {
-  PlayerController(this._handler, {LibraryRepository? repository})
-      : _repository = repository ?? const LibraryRepository();
+  PlayerController(
+    this._handler, {
+    LibraryRepository? repository,
+    MusicFolderRepository? folderRepository,
+  })  : _repository = repository ?? const LibraryRepository(),
+        _folders = folderRepository ?? MusicFolderRepository();
 
   final SourcecrushAudioHandler _handler;
   final LibraryRepository _repository;
+  final MusicFolderRepository _folders;
 
   List<Track> _tracks = const [];
   List<Track> get tracks => _tracks;
   bool get hasTracks => _tracks.isEmpty == false;
 
-  /// Paths currently loaded into the audio handler's queue, so we only reload
-  /// the player when the library on disk actually changed.
-  List<String> _loadedPaths = const [];
+  /// URIs currently loaded into the audio handler's queue, so the player is
+  /// only reloaded when the library actually changed.
+  List<String> _loadedUris = const [];
 
   int? _index;
   int? get currentIndex => _index;
@@ -49,19 +55,64 @@ class PlayerController extends ChangeNotifier {
 
   Duration get duration => _handler.duration ?? Duration.zero;
 
-  /// Re-scans the music directory. Safe to call on every resume.
+  /// Folders the user has chosen to scan.
+  List<MusicFolder> get folders => _folders.folders;
+
+  bool _scanning = false;
+  bool get isScanning => _scanning;
+
+  /// Re-reads every source: the app's music directory plus each folder the
+  /// user granted. Safe to call on resume.
   Future<void> refreshLibrary() async {
-    _tracks = await _repository.scan();
+    if (_scanning) return;
+    _scanning = true;
     notifyListeners();
-    await _ensureQueueLoaded();
+    try {
+      final downloaded = await _repository.scan();
+      final fromFolders = await _folders.scanAll();
+
+      // Downloads first (they are the app's own files), then folder tracks.
+      _tracks = [...downloaded, ...fromFolders];
+      notifyListeners();
+      await _ensureQueueLoaded();
+    } finally {
+      _scanning = false;
+      notifyListeners();
+    }
+  }
+
+  /// Prompts for a folder and adds it to the scan set.
+  ///
+  /// Returns true when a new folder was registered.
+  Future<bool> addMusicFolder() async {
+    final folder = await _folders.addFolder();
+    if (folder == null) return false;
+    await refreshLibrary();
+    return true;
+  }
+
+  Future<void> removeMusicFolder(String uri) async {
+    await _folders.removeFolder(uri);
+    await refreshLibrary();
   }
 
   Future<void> playTrackAt(int index) async {
     if (index < 0 || index >= _tracks.length) return;
     await _ensureQueueLoaded();
     _index = index;
+    _position = Duration.zero;
     notifyListeners();
     await _handler.playTrackAt(index);
+  }
+
+  /// Plays a liked track by looking it up in the current library.
+  ///
+  /// Returns false when the file is no longer present.
+  Future<bool> playTrackById(String id) async {
+    final index = _tracks.indexWhere((t) => t.id == id);
+    if (index == -1) return false;
+    await playTrackAt(index);
+    return true;
   }
 
   Future<void> togglePlay() => _handler.togglePlay();
@@ -99,15 +150,16 @@ class PlayerController extends ChangeNotifier {
   /// Loading is lazy (nothing is decoded until playback starts), so this is
   /// cheap, but it has to happen before any transport control can work.
   Future<void> _ensureQueueLoaded() async {
-    final paths = _tracks.map((t) => t.path).toList();
-    if (listEquals(paths, _loadedPaths)) return;
+    final uris = _tracks.map((t) => t.uri).toList();
+    if (listEquals(uris, _loadedUris)) return;
 
     // Reloading mid-playback would interrupt the current track, so the new
     // queue is picked up the next time playback starts instead.
     if (_handler.playing) return;
 
-    final keepIndex = (_index ?? 0).clamp(0, paths.isEmpty ? 0 : paths.length - 1);
+    final keepIndex =
+        (_index ?? 0).clamp(0, uris.isEmpty ? 0 : uris.length - 1);
     await _handler.loadTracks(_tracks, initialIndex: keepIndex, autoPlay: false);
-    _loadedPaths = paths;
+    _loadedUris = uris;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../player_controller.dart';
+import 'theme.dart';
 
 /// Full screen player: artwork, seek bar, transport controls.
 class NowPlayingScreen extends StatelessWidget {
@@ -28,7 +29,6 @@ class NowPlayingScreen extends StatelessWidget {
             );
           }
 
-          final accent = Theme.of(context).colorScheme.primary;
           final duration = controller.duration;
           final maxMs = duration.inMilliseconds
               .toDouble()
@@ -47,7 +47,7 @@ class NowPlayingScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         const SizedBox(height: 24),
-                        _Artwork(accent: accent),
+                        const _Artwork(),
                         const SizedBox(height: 40),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -87,9 +87,8 @@ class NowPlayingScreen extends StatelessWidget {
                   controller: controller,
                   maxMs: maxMs,
                   format: _format,
-                  accent: accent,
                 ),
-                _TransportControls(controller: controller, accent: accent),
+                _TransportControls(controller: controller),
                 SizedBox(height: bottomInset + 20),
               ],
             ),
@@ -134,9 +133,7 @@ class _TopBar extends StatelessWidget {
 }
 
 class _Artwork extends StatelessWidget {
-  const _Artwork({required this.accent});
-
-  final Color accent;
+  const _Artwork();
 
   @override
   Widget build(BuildContext context) {
@@ -145,17 +142,10 @@ class _Artwork extends StatelessWidget {
       height: 260,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: 0.85),
-            accent.withValues(alpha: 0.25),
-            const Color(0xFF1A1A1A),
-          ],
-        ),
+        gradient: SC.artworkGradient,
+        border: Border.all(color: SC.outline),
       ),
-      child: const Icon(Icons.music_note, size: 84, color: Colors.black26),
+      child: const Icon(Icons.music_note, size: 84, color: Color(0x1FFFFFFF)),
     );
   }
 }
@@ -165,13 +155,11 @@ class _SeekBar extends StatelessWidget {
     required this.controller,
     required this.maxMs,
     required this.format,
-    required this.accent,
   });
 
   final PlayerController controller;
   final double maxMs;
   final String Function(Duration) format;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -187,9 +175,9 @@ class _SeekBar extends StatelessWidget {
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               trackHeight: 3,
-              activeTrackColor: accent,
-              inactiveTrackColor: Colors.white12,
-              thumbColor: accent,
+              activeTrackColor: SC.text,
+              inactiveTrackColor: SC.outline,
+              thumbColor: SC.text,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
             ),
@@ -208,11 +196,11 @@ class _SeekBar extends StatelessWidget {
               children: [
                 Text(
                   format(controller.position),
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: const TextStyle(color: SC.textFaint, fontSize: 12),
                 ),
                 Text(
                   format(controller.duration),
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: const TextStyle(color: SC.textFaint, fontSize: 12),
                 ),
               ],
             ),
@@ -224,10 +212,9 @@ class _SeekBar extends StatelessWidget {
 }
 
 class _TransportControls extends StatelessWidget {
-  const _TransportControls({required this.controller, required this.accent});
+  const _TransportControls({required this.controller});
 
   final PlayerController controller;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -239,7 +226,7 @@ class _TransportControls extends StatelessWidget {
           IconButton(
             onPressed: controller.toggleShuffle,
             iconSize: 26,
-            color: controller.shuffleEnabled ? accent : Colors.white38,
+            color: controller.shuffleEnabled ? SC.text : SC.textGhost,
             icon: const Icon(Icons.shuffle),
           ),
           IconButton(
@@ -248,7 +235,7 @@ class _TransportControls extends StatelessWidget {
             color: Colors.white,
             icon: const Icon(Icons.skip_previous),
           ),
-          _PlayButton(controller: controller, accent: accent),
+          _PlayButton(controller: controller),
           IconButton(
             onPressed: controller.next,
             iconSize: 38,
@@ -258,7 +245,7 @@ class _TransportControls extends StatelessWidget {
           IconButton(
             onPressed: controller.cycleRepeat,
             iconSize: 26,
-            color: controller.repeatEnabled ? accent : Colors.white38,
+            color: controller.repeatEnabled ? SC.text : SC.textGhost,
             icon: Icon(
               controller.repeatOne ? Icons.repeat_one : Icons.repeat,
             ),
@@ -270,10 +257,9 @@ class _TransportControls extends StatelessWidget {
 }
 
 class _PlayButton extends StatelessWidget {
-  const _PlayButton({required this.controller, required this.accent});
+  const _PlayButton({required this.controller});
 
   final PlayerController controller;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -283,7 +269,10 @@ class _PlayButton extends StatelessWidget {
       child: Container(
         width: 76,
         height: 76,
-        decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+          color: SC.text,
+          shape: BoxShape.circle,
+        ),
         child: Icon(
           playing ? Icons.pause : Icons.play_arrow,
           size: 40,

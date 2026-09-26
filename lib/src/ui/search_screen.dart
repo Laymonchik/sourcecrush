@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'empty_state.dart';
 import 'layout.dart';
 import 'screen_header.dart';
+import 'theme.dart';
 
 /// Search tab. The field is in place; querying YouTube arrives with the
 /// yt-dlp backend.
@@ -24,8 +25,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-
     return SafeArea(
       child: Padding(
         // Keeps the centred empty state clear of the floating overlay.
@@ -37,18 +36,18 @@ class _SearchScreenState extends State<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
               child: TextField(
                 controller: _controller,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                cursorColor: accent,
+                style: const TextStyle(color: SC.text, fontSize: 15),
+                cursorColor: SC.text,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Songs, artists, anything',
                   hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.32),
+                    color: SC.textGhost,
                     fontSize: 15,
                   ),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                  prefixIcon: const Icon(Icons.search, color: SC.textFaint),
                   filled: true,
-                  fillColor: const Color(0xFF16161A),
+                  fillColor: SC.surface,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
@@ -57,12 +56,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
                     borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: SC.outline,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
-                    borderSide: BorderSide(color: accent, width: 1.4),
+                    borderSide: const BorderSide(color: SC.text, width: 1.4),
                   ),
                 ),
               ),

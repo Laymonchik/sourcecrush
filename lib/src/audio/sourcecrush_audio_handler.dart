@@ -45,7 +45,11 @@ class SourcecrushAudioHandler extends BaseAudioHandler
 
     await _player.setAudioSources(
       tracks
-          .map((t) => AudioSource.file(t.path, tag: t.toMediaItem()))
+          .map(
+            // AudioSource.uri handles both file:// (app downloads) and
+            // content:// (user-picked folders) URIs.
+            (t) => AudioSource.uri(t.parsedUri, tag: t.toMediaItem()),
+          )
           .toList(),
       initialIndex: index,
       initialPosition: Duration.zero,
