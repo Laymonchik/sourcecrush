@@ -132,8 +132,19 @@ class _MarqueeTextState extends State<MarqueeText>
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
+                  // Start the line centred, then let it travel left a full
+                  // copy and wrap. Without the centring offset a long title
+                  // sits against the left edge and only ever scrolls out of
+                  // view, which reads as clipped text rather than a marquee.
+                  final restOffset = ((available - textWidth) / 2).clamp(
+                    0.0,
+                    double.infinity,
+                  );
                   return Transform.translate(
-                    offset: Offset(-_controller.value * _copyStride, 0),
+                    offset: Offset(
+                      restOffset - _controller.value * _copyStride,
+                      0,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.center,

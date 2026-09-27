@@ -106,10 +106,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      // Artwork takes the space it can while leaving room for
-                      // the heading and controls on a short screen.
-                      final side = (constraints.maxWidth * 0.82)
-                          .clamp(0.0, constraints.maxHeight * 0.50);
+                      // Artwork fills the width, minus the heading's own
+                      // horizontal padding so the two share one grid.
+                      final side = (constraints.maxWidth - 64)
+                          .clamp(0.0, constraints.maxHeight * 0.62);
 
                       return Column(
                         children: [
@@ -124,11 +124,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                               ),
                             ),
                           ),
-                          // Fixed gaps rather than a scroll view: the layout
-                          // is already bounded, and scrolling here made the
-                          // heading drift away from the artwork.
                           SizedBox(height: constraints.maxHeight * 0.05),
-                          _TrackHeading(track: track),
+                          // Same gutter as the artwork on both sides, so the
+                          // heading box lines up with the art above it.
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: (constraints.maxWidth - side) / 2 + 16,
+                            ),
+                            child: _TrackHeading(track: track),
+                          ),
                           const Spacer(),
                         ],
                       );
@@ -200,15 +204,16 @@ class _TrackHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        children: [
-          // Centred as a block, then each line scrolls inside its own box. A
-          // centred marquee drifts sideways as it moves, which reads as a
-          // layout bug, and without the clip the moving text slides out over
-          // the artwork and the screen edges.
-          ClipRect(
+    return Column(
+      children: [
+        // The heading spans the full width minus the screen gutter, matching
+        // the artwork's box, so both lines share one grid and the text stays
+        // centred in it. Each line scrolls inside its own clipped box: a
+        // centred marquee widget drifts sideways as it moves, and unclipped
+        // text slides out over the artwork and the screen edges.
+        ClipRect(
+          child: SizedBox(
+            width: double.infinity,
             child: MarqueeText(
               text: track.title,
               style: const TextStyle(
@@ -220,8 +225,11 @@ class _TrackHeading extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          ClipRect(
+        ),
+        const SizedBox(height: 6),
+        ClipRect(
+          child: SizedBox(
+            width: double.infinity,
             child: MarqueeText(
               text: track.artist,
               style: const TextStyle(
@@ -231,8 +239,8 @@ class _TrackHeading extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
