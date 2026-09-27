@@ -1,95 +1,154 @@
 import 'package:flutter/material.dart';
 
+import '../models/track.dart';
 import '../player_controller.dart';
+import 'marquee_text.dart';
 import 'theme.dart';
+import 'track_artwork.dart';
+import 'waveform.dart';
 
-/// Full screen player: artwork, seek bar, transport controls.
-class NowPlayingScreen extends StatelessWidget {
+/// Full screen player: large artwork, waveform scrubber, transport controls.
+class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key, required this.controller});
 
   final PlayerController controller;
 
-  String _format(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+  @override
+  State<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+class _NowPlayingScreenState extends State<NowPlayingScreen> {
+  /// Peaks for the track on screen, keyed by uri so switching tracks re-decodes
+  /// rather than showing the previous track's shape.
+  final Map<String, List<double>> _waveforms = {};
+  String? _waveformFor;
+  bool _decoding = false;
+
+  PlayerController get _controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onPlaybackChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWaveform());
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onPlaybackChanged);
+    super.dispose();
+  }
+
+  void _onPlaybackChanged() {
+    // Position ticks arrive many times a second; only the track identity is
+    // interesting here.
+    final id = _controller.currentTrack?.id;
+    if (id != _waveformFor) {
+      _loadWaveform();
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadWaveform() async {
+    final track = _controller.currentTrack;
+    if (track == null) return;
+
+    _waveformFor = track.id;
+    final cached = _waveforms[track.id];
+    if (cached != null) {
+      if (mounted) setState(() {});
+      return;
+    }
+
+    _decoding = true;
+    if (mounted) setState(() {});
+
+    final peaks = await _controller.waveformFor(track);
+    if (!mounted) return;
+
+    // The user may have skipped on while this was decoding.
+    if (_controller.currentTrack?.id == track.id) {
+      _waveforms[track.id] = peaks;
+    }
+    _decoding = false;
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: SC.background,
       body: AnimatedBuilder(
-        animation: controller,
+        animation: _controller,
         builder: (context, _) {
-          final track = controller.currentTrack;
+          final track = _controller.currentTrack;
           if (track == null) {
             return const Center(
-              child: Text('Nothing playing', style: TextStyle(color: Colors.white38)),
+              child: Text(
+                'Nothing playing',
+                style: TextStyle(color: SC.textFaint),
+              ),
             );
           }
 
-          final duration = controller.duration;
-          final maxMs = duration.inMilliseconds
-              .toDouble()
-              .clamp(1, double.infinity)
-              .toDouble();
-          // Android draws this app edge to edge, so the transport row has to
-          // clear the gesture/navigation bar itself.
-          final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+          final duration = _controller.duration;
+          final durationMs = duration.inMilliseconds;
+          final progress = durationMs <= 0
+              ? 0.0
+              : (_controller.position.inMilliseconds / durationMs)
+                  .clamp(0.0, 1.0);
 
           return SafeArea(
             child: Column(
               children: [
-                _TopBar(onClose: () => Navigator.of(context).maybePop()),
+                const _TopBar(),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 24),
-                        const _Artwork(),
-                        const SizedBox(height: 40),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Column(
-                            children: [
-                              Text(
-                                track.title,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.4,
-                                ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Artwork takes the space it can while leaving room for
+                      // the heading and controls on a short screen.
+                      final side = (constraints.maxWidth * 0.82)
+                          .clamp(0.0, constraints.maxHeight * 0.50);
+
+                      return Column(
+                        children: [
+                          SizedBox(height: constraints.maxHeight * 0.03),
+                          Center(
+                            child: SizedBox(
+                              width: side,
+                              height: side,
+                              child: TrackArtwork(
+                                track: track,
+                                borderRadius: 16,
                               ),
-                              const SizedBox(height: 10),
-                              Text(
-                                track.artist,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                          // Fixed gaps rather than a scroll view: the layout
+                          // is already bounded, and scrolling here made the
+                          // heading drift away from the artwork.
+                          SizedBox(height: constraints.maxHeight * 0.05),
+                          _TrackHeading(track: track),
+                          const Spacer(),
+                        ],
+                      );
+                    },
                   ),
                 ),
-                _SeekBar(
-                  controller: controller,
-                  maxMs: maxMs,
-                  format: _format,
+                _WaveformSection(
+                  controller: _controller,
+                  progress: progress,
+                  peaks: _waveforms[track.id] ?? const [],
+                  decoding: _decoding,
+                  onSeek: (fraction) {
+                    final target = Duration(
+                      milliseconds: (durationMs * fraction).round(),
+                    );
+                    _controller.seek(target);
+                  },
                 ),
-                _TransportControls(controller: controller),
-                SizedBox(height: bottomInset + 20),
+                _TransportControls(controller: _controller),
+                const SizedBox(height: 28),
               ],
             ),
           );
@@ -100,9 +159,7 @@ class NowPlayingScreen extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onClose});
-
-  final VoidCallback onClose;
+  const _TopBar();
 
   @override
   Widget build(BuildContext context) {
@@ -111,14 +168,18 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            onPressed: onClose,
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              color: SC.text,
+              size: 30,
+            ),
           ),
           const Spacer(),
           const Text(
             'NOW PLAYING',
             style: TextStyle(
-              color: Colors.white30,
+              color: SC.textGhost,
               fontSize: 11,
               letterSpacing: 2.5,
               fontWeight: FontWeight.w600,
@@ -132,74 +193,99 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _Artwork extends StatelessWidget {
-  const _Artwork();
+class _TrackHeading extends StatelessWidget {
+  const _TrackHeading({required this.track});
+
+  final Track track;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      height: 260,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: SC.artworkGradient,
-        border: Border.all(color: SC.outline),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        children: [
+          // Centred as a block, then each line scrolls inside its own box. A
+          // centred marquee drifts sideways as it moves, which reads as a
+          // layout bug, and without the clip the moving text slides out over
+          // the artwork and the screen edges.
+          ClipRect(
+            child: MarqueeText(
+              text: track.title,
+              style: const TextStyle(
+                color: SC.text,
+                fontSize: 21,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+                height: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ClipRect(
+            child: MarqueeText(
+              text: track.artist,
+              style: const TextStyle(
+                color: SC.textMuted,
+                fontSize: 15,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
       ),
-      child: const Icon(Icons.music_note, size: 84, color: Color(0x1FFFFFFF)),
     );
   }
 }
 
-class _SeekBar extends StatelessWidget {
-  const _SeekBar({
+class _WaveformSection extends StatelessWidget {
+  const _WaveformSection({
     required this.controller,
-    required this.maxMs,
-    required this.format,
+    required this.progress,
+    required this.peaks,
+    required this.decoding,
+    required this.onSeek,
   });
 
   final PlayerController controller;
-  final double maxMs;
-  final String Function(Duration) format;
+  final double progress;
+  final List<double> peaks;
+  final bool decoding;
+  final ValueChanged<double> onSeek;
 
   @override
   Widget build(BuildContext context) {
-    final positionMs = controller.position.inMilliseconds
-        .toDouble()
-        .clamp(0.0, maxMs)
-        .toDouble();
-
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
+      padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
       child: Column(
         children: [
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              activeTrackColor: SC.text,
-              inactiveTrackColor: SC.outline,
-              thumbColor: SC.text,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-            ),
-            child: Slider(
-              value: positionMs,
-              max: maxMs,
-              onChanged: (value) {
-                controller.seek(Duration(milliseconds: value.round()));
-              },
-            ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              WaveformSeekBar(
+                peaks: peaks,
+                progress: progress,
+                onSeek: onSeek,
+              ),
+              // Decoding is fast but not instant on a long track; saying so is
+              // better than showing an empty bar that looks broken.
+              if (decoding && peaks.isEmpty)
+                const Text(
+                  'Reading waveform...',
+                  style: TextStyle(color: SC.textFaint, fontSize: 12),
+                ),
+            ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.only(top: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  format(controller.position),
+                  _formatPosition(controller.position),
                   style: const TextStyle(color: SC.textFaint, fontSize: 12),
                 ),
                 Text(
-                  format(controller.duration),
+                  _formatPosition(controller.duration),
                   style: const TextStyle(color: SC.textFaint, fontSize: 12),
                 ),
               ],
@@ -208,6 +294,12 @@ class _SeekBar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _formatPosition(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 }
 
@@ -232,14 +324,14 @@ class _TransportControls extends StatelessWidget {
           IconButton(
             onPressed: controller.previous,
             iconSize: 38,
-            color: Colors.white,
+            color: SC.text,
             icon: const Icon(Icons.skip_previous),
           ),
           _PlayButton(controller: controller),
           IconButton(
             onPressed: controller.next,
             iconSize: 38,
-            color: Colors.white,
+            color: SC.text,
             icon: const Icon(Icons.skip_next),
           ),
           IconButton(

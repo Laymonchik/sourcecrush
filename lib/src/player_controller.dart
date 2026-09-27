@@ -3,6 +3,7 @@ import 'package:just_audio/just_audio.dart' show LoopMode;
 
 import 'audio/sourcecrush_audio_handler.dart';
 import 'library/library_repository.dart';
+import 'library/media_metadata_service.dart';
 import 'library/music_folder_repository.dart';
 import 'library/native_bridge.dart';
 import 'models/track.dart';
@@ -16,12 +17,15 @@ class PlayerController extends ChangeNotifier {
     this._handler, {
     LibraryRepository? repository,
     MusicFolderRepository? folderRepository,
+    MediaMetadataService? metadata,
   })  : _repository = repository ?? const LibraryRepository(),
-        _folders = folderRepository ?? MusicFolderRepository();
+        _folders = folderRepository ?? MusicFolderRepository(),
+        _metadata = metadata ?? MediaMetadataService();
 
   final SourcecrushAudioHandler _handler;
   final LibraryRepository _repository;
   final MusicFolderRepository _folders;
+  final MediaMetadataService _metadata;
 
   List<Track> _tracks = const [];
   List<Track> get tracks => _tracks;
@@ -62,7 +66,7 @@ class PlayerController extends ChangeNotifier {
   bool get isScanning => _scanning;
 
   /// Re-reads every source: the app's music directory plus each folder the
-  /// user granted. Safe to call on resume.
+  /// user granted, then fills in real tags and cover art.
   Future<void> refreshLibrary() async {
     if (_scanning) return;
     _scanning = true;
@@ -70,9 +74,15 @@ class PlayerController extends ChangeNotifier {
     try {
       final downloaded = await _repository.scan();
       final fromFolders = await _folders.scanAll();
+      final all = [...downloaded, ...fromFolders];
 
-      // Downloads first (they are the app's own files), then folder tracks.
-      _tracks = [...downloaded, ...fromFolders];
+      // Show the bare list straight away so the library is usable, then swap in
+      // the enriched version once tags have been read. Reading tags decodes
+      // every file, which is far too slow to sit in front of the first frame.
+      _tracks = all;
+      notifyListeners();
+
+      _tracks = await _metadata.enrichAll(all);
       notifyListeners();
       await _ensureQueueLoaded();
     } finally {
@@ -80,6 +90,17 @@ class PlayerController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Tags and artwork for [track], for the parts of the UI that need them
+  /// outside a full library refresh.
+  Future<Track> enrich(Track track) async {
+    final tags = await _metadata.tagsFor(track);
+    return _metadata.enrich(track, tags);
+  }
+
+  /// Waveform peaks for the now playing track.
+  Future<List<double>> waveformFor(Track track) =>
+      _metadata.waveformFor(track);
 
   /// Prompts for a folder and adds it to the scan set.
   ///

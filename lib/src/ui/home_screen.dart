@@ -7,6 +7,7 @@ import 'empty_state.dart';
 import 'layout.dart';
 import 'screen_header.dart';
 import 'theme.dart';
+import 'track_artwork.dart';
 
 /// Library tab: everything the app manages, plus whatever the user has chosen
 /// to expose from their own folders.
@@ -121,7 +122,7 @@ class _TrackList extends StatelessWidget {
         height: 1,
         thickness: 1,
         color: SC.outline,
-        indent: 76,
+        indent: 82,
       ),
       itemBuilder: (context, index) {
         final track = controller.tracks[index];
@@ -161,27 +162,19 @@ class _TrackTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         child: Row(
           children: [
             SizedBox(
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
+              // While playing, the equaliser takes the row's place so the
+              // artwork does not flicker between two different states.
               child: isPlaying
-                  ? _PlayingBars()
-                  : DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: SC.surface,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.music_note,
-                        size: 18,
-                        color: SC.textFaint,
-                      ),
-                    ),
+                  ? const Center(child: _PlayingBars())
+                  : TrackArtwork(track: track, size: 44, borderRadius: 8),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,14 +244,14 @@ class _PlayingBarsState extends State<_PlayingBars>
       builder: (context, _) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: List.generate(3, (i) {
             final phase = (_c.value * 3 - i) % 3;
-            final height = 8 + 20 * (phase < 2 ? phase : 3 - phase);
+            final height = 6 + 22 * (phase < 2 ? phase : 3 - phase);
             return Container(
               width: 3,
               height: height,
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
                 color: SC.text,
                 borderRadius: BorderRadius.circular(2),

@@ -18,8 +18,8 @@ import java.util.concurrent.Executors
  */
 class MusicFolders(
     private val activity: Activity,
-    channel: MethodChannel,
-) : MethodChannel.MethodCallHandler {
+    private val channel: MethodChannel,
+) {
 
     private val io = Executors.newSingleThreadExecutor()
     private var pendingPick: MethodChannel.Result? = null
@@ -35,7 +35,15 @@ class MusicFolders(
         pendingPick = null
     }
 
-    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+    /**
+     * Handles the folder-related calls.
+     *
+     * Returns true when the call was consumed, so the caller can fall through
+     * to the other handlers (media metadata, native library dir) otherwise.
+     * Not an `override`: [MethodChannel.MethodCallHandler.onMethodCall] returns
+     * Unit and has to stay the default entry point.
+     */
+    fun onMethodCall(call: MethodCall, result: MethodChannel.Result): Boolean {
         when (call.method) {
             "pickMusicFolder" -> pickFolder(result)
             "listAudioIn" -> {
@@ -57,8 +65,9 @@ class MusicFolders(
                 if (treeUri != null) releaseAccess(treeUri)
                 result.success(null)
             }
-            else -> result.notImplemented()
+            else -> return false
         }
+        return true
     }
 
     private fun pickFolder(result: MethodChannel.Result) {

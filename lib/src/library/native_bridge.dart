@@ -4,6 +4,32 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+/// Tags and cover art read from an audio file by the platform extractor.
+///
+/// Every field is optional: plenty of files in the wild carry nothing useful,
+/// and a missing tag should degrade to the filename rather than throw.
+class MediaTags {
+  const MediaTags({
+    this.title,
+    this.artist,
+    this.album,
+    this.artworkPath,
+    this.duration,
+  });
+
+  final String? title;
+  final String? artist;
+  final String? album;
+
+  /// Absolute path to a downsampled JPEG in the app cache.
+  final String? artworkPath;
+
+  final Duration? duration;
+
+  bool get hasArtwork => artworkPath != null;
+  bool get isEmpty => title == null && artist == null && album == null;
+}
+
 /// One entry inside a picked music folder, as reported by the platform side.
 ///
 /// Enumeration is deliberately one directory level at a time: a granted tree
@@ -131,6 +157,43 @@ class NativeBridge {
                   ),
           ),
     ];
+  }
+
+  /// Tags and cover art read out of the file itself.
+  ///
+  /// [artworkPath] points at a downsampled JPEG in the app cache rather than
+  /// shipping image bytes across the channel.
+  Future<MediaTags> readMetadata(String uri) async {
+    final raw = await _channel.invokeMapMethod<String, Object?>(
+      'readMetadata',
+      {'uri': uri},
+    );
+    if (raw == null) return const MediaTags();
+    return MediaTags(
+      title: raw['title'] as String?,
+      artist: raw['artist'] as String?,
+      album: raw['album'] as String?,
+      artworkPath: raw['artworkPath'] as String?,
+      duration: switch (raw['durationMs']) {
+        final num ms => Duration(milliseconds: ms.toInt()),
+        _ => null,
+      },
+    );
+  }
+
+  /// Peak amplitudes in 0..1, decoded from the audio for the waveform view.
+  ///
+  /// Returns an empty list when the file cannot be decoded, which the UI
+  /// renders as a flat placeholder rather than an error.
+  Future<List<double>> readWaveform(String uri, {int buckets = 96}) async {
+    final raw = await _channel
+        .invokeMapMethod<String, Object?>(
+          'readWaveform',
+          {'uri': uri, 'buckets': buckets},
+        )
+        .timeout(const Duration(seconds: 30));
+    final peaks = raw?['peaks'] as List<Object?>? ?? const [];
+    return [for (final p in peaks) (p as num).toDouble().clamp(0.0, 1.0)];
   }
 
   /// Releases the persisted permission for a folder the user removed.

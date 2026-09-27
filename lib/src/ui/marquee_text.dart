@@ -80,6 +80,8 @@ class _MarqueeTextState extends State<MarqueeText>
             : textWidth;
         final gap = available * 0.35;
         _copyStride = textWidth + gap;
+        final lineHeight =
+            (widget.style.fontSize ?? 14) * (widget.style.height ?? 1.2);
         final overflows = textWidth > available;
         if (overflows != _overflows) {
           // Defer so we never call setState during layout.
@@ -107,30 +109,43 @@ class _MarqueeTextState extends State<MarqueeText>
           );
         }
 
-        return ClipRect(
-          child: ShaderMask(
-            shaderCallback: (rect) => const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [Colors.transparent, Colors.white, Colors.white, Colors.transparent],
-              stops: [0, 0.12, 0.88, 1],
-            ).createShader(rect),
-            blendMode: BlendMode.dstIn,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                return Transform.translate(
-                  offset: Offset(-_controller.value * _copyStride, 0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      text,
-                      SizedBox(width: gap),
-                      text,
-                    ],
-                  ),
-                );
-              },
+        // Height is pinned to the text's own line height: the shader mask sizes
+        // itself to the child, and an unpinned Row with 21px text plus the
+        // default leading claims far more vertical space than it draws, which
+        // pushed the heading around in the now playing column.
+        return SizedBox(
+          height: lineHeight,
+          child: ClipRect(
+            child: ShaderMask(
+              shaderCallback: (rect) => const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Colors.transparent,
+                  Colors.white,
+                  Colors.white,
+                  Colors.transparent,
+                ],
+                stops: [0, 0.12, 0.88, 1],
+              ).createShader(rect),
+              blendMode: BlendMode.dstIn,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return Transform.translate(
+                    offset: Offset(-_controller.value * _copyStride, 0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        text,
+                        SizedBox(width: gap),
+                        text,
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         );

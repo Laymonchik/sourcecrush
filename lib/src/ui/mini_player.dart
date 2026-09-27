@@ -1,13 +1,12 @@
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import '../models/track.dart';
 import '../player_controller.dart';
 import 'marquee_text.dart';
 import 'now_playing_screen.dart';
 import 'theme.dart';
+import 'track_artwork.dart';
 
 /// Floating "now playing" pill.
 ///
@@ -90,7 +89,11 @@ class MiniPlayer extends StatelessWidget {
                           GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () => _openNowPlaying(context),
-                            child: _Artwork(track: track),
+                            child: TrackArtwork(
+                              track: track,
+                              size: 46,
+                              borderRadius: 999,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -163,52 +166,6 @@ class MiniPlayer extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-/// Circular album art. Falls back to a grey placeholder until real cover art is
-/// available from the download pipeline.
-class _Artwork extends StatelessWidget {
-  const _Artwork({required this.track});
-
-  final Track track;
-
-  @override
-  Widget build(BuildContext context) {
-    final artUri = track.artUri;
-    final isLocalFile = artUri != null && artUri.scheme == 'file';
-    final hasNetworkArt = artUri != null && artUri.scheme == 'http';
-
-    Widget child = const Icon(
-      Icons.music_note,
-      color: Color(0xB3FFFFFF),
-      size: 20,
-    );
-
-    if (isLocalFile) {
-      child = Image.file(
-        File(artUri.toFilePath()),
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => child,
-      );
-    } else if (hasNetworkArt) {
-      child = Image.network(
-        artUri.toString(),
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => child,
-      );
-    }
-
-    return Container(
-      width: 46,
-      height: 46,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: SC.artworkGradient,
-        border: Border.all(color: SC.outline),
-      ),
-      child: ClipOval(child: child),
     );
   }
 }

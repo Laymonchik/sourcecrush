@@ -32,6 +32,11 @@ abstract final class SC {
 }
 
 /// The app-wide dark theme.
+///
+/// Type is the platform's own UI font. No `fontFamily` is set anywhere in the
+/// app, so Flutter resolves to the system face (Roboto on Android) and picks up
+/// the user's font scale and weight settings for free. The only bundled fonts
+/// are Material's icon font, which is not text.
 ThemeData buildSourcecrushTheme() {
   const scheme = ColorScheme.dark(
     primary: Colors.white,
